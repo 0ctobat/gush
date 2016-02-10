@@ -7,7 +7,8 @@ require 'sidekiq/api'
 
 module Gush
   class CLI < Thor
-    class_option :endpoint, desc: "configuration file to use or Rails 3/4 app Root folder", aliases: "-f"
+    class_option :gushfile, desc: "configuration file to use", aliases: "-f"
+    class_option :endpoint, desc: "Optional path to Rails 3/4 app, for sidekiq endpoint. Default to Gush configuration file", aliases: "-a"
     class_option :concurrency, desc: "concurrency setting for Sidekiq", aliases: "-c"
     class_option :redis, desc: "Redis URL to use", aliases: "-r"
     class_option :namespace, desc: "namespace to run jobs in", aliases: "-n"
@@ -16,13 +17,14 @@ module Gush
     def initialize(*)
       super
       Gush.configure do |config|
+        config.gushfile    = options.fetch("gushfile",    config.gushfile)
         config.endpoint    = options.fetch("endpoint",    config.endpoint)
         config.concurrency = options.fetch("concurrency", config.concurrency)
         config.redis_url   = options.fetch("redis",       config.redis_url)
         config.namespace   = options.fetch("namespace",   config.namespace)
         config.environment = options.fetch("environment", config.environment)
       end
-      load_endpoint
+      load_gushfile
     end
 
     desc "create [WorkflowClass]", "Registers new workflow"
@@ -126,20 +128,20 @@ module Gush
       puts overview(workflow).jobs_list(jobs)
     end
 
-    def endpoint
-      Gush.configuration.endpoint
+    def gushfile
+      Gush.configuration.gushfile
     end
     
-    def load_endpoint
-      endpoint = client.configuration.endpoint
-      if !endpoint.exist?
-        raise Thor::Error, "#{endpoint} not found, please add it to your project or make sure it points to the root dir of a Rails 3/4 app".colorize(:red)
+    def load_gushfile
+      gushfile = client.configuration.gushfile
+      if !gushfile.exist?
+        raise Thor::Error, "#{gushfile} not found, please add it to your project or make sure it points to the root dir of a Rails 3/4 app".colorize(:red)
       end
       
-      require endpoint if !File.directory?(endpoint) && File.exist?(endpoint)
+      require gushfile if !File.directory?(gushfile) && File.exist?(gushfile)
       
     rescue LoadError
-      raise Thor::Error, "failed to require #{endpoint}".colorize(:red)
+      raise Thor::Error, "failed to require #{gushfile}".colorize(:red)
     end
   end
 end

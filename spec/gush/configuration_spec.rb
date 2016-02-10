@@ -3,11 +3,11 @@ require 'spec_helper'
 describe Gush::Configuration do
 
   it "has defaults set" do
-    subject.endpoint = GUSHFILE
+    subject.gushfile = GUSHFILE
     expect(subject.redis_url).to eq("redis://localhost:6379")
     expect(subject.concurrency).to eq(5)
     expect(subject.namespace).to eq('gush')
-    expect(subject.endpoint).to eq(GUSHFILE.realpath)
+    expect(subject.gushfile).to eq(GUSHFILE.realpath)
     expect(subject.environment).to eq('development')
   end
 
