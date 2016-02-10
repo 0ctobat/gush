@@ -12,16 +12,16 @@ module Gush
       self.concurrency = hash.fetch(:concurrency, 5)
       self.namespace   = hash.fetch(:namespace, 'gush')
       self.redis_url   = hash.fetch(:redis_url, 'redis://localhost:6379')
-      self.gushfile    = hash.fetch(:gushfile, 'Gushfile.rb')
+      self.endpoint    = hash.fetch(:endpoint, '.')
       self.environment = hash.fetch(:environment, 'development')
     end
 
-    def gushfile=(path)
-      @gushfile = Pathname(path)
+    def endpoint=(path)
+      @endpoint = Pathname(path)
     end
 
-    def gushfile
-      @gushfile.realpath
+    def endpoint
+      @endpoint.realpath
     end
 
     def to_hash

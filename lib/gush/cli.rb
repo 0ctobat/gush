@@ -7,22 +7,22 @@ require 'sidekiq/api'
 
 module Gush
   class CLI < Thor
-    class_option :gushfile, desc: "configuration file to use", aliases: "-f"
+    class_option :endpoint, desc: "configuration file to use or Rails 3/4 app Root folder", aliases: "-f"
     class_option :concurrency, desc: "concurrency setting for Sidekiq", aliases: "-c"
     class_option :redis, desc: "Redis URL to use", aliases: "-r"
     class_option :namespace, desc: "namespace to run jobs in", aliases: "-n"
-    class_option :env, desc: "Sidekiq environment", aliases: "-e"
+    class_option :environment, desc: "Sidekiq environment", aliases: "-e"
 
     def initialize(*)
       super
       Gush.configure do |config|
-        config.gushfile    = options.fetch("gushfile",    config.gushfile)
+        config.endpoint    = options.fetch("endpoint",    config.endpoint)
         config.concurrency = options.fetch("concurrency", config.concurrency)
         config.redis_url   = options.fetch("redis",       config.redis_url)
         config.namespace   = options.fetch("namespace",   config.namespace)
         config.environment = options.fetch("environment", config.environment)
       end
-      load_gushfile
+      load_endpoint
     end
 
     desc "create [WorkflowClass]", "Registers new workflow"
@@ -92,7 +92,7 @@ module Gush
     desc "workers", "Starts Sidekiq workers"
     def workers
       config = client.configuration
-      Kernel.exec "bundle exec sidekiq -r #{config.gushfile} -c #{config.concurrency} -q #{config.namespace} -e #{config.environment} -v"
+      Kernel.exec "bundle exec sidekiq -r #{config.endpoint} -c #{config.concurrency} -q #{config.namespace} -e #{config.environment} -v"
     end
 
     desc "viz [WorkflowClass]", "Displays graph, visualising job dependencies"
@@ -129,16 +129,38 @@ module Gush
     def gushfile
       Gush.configuration.gushfile
     end
-
-    def load_gushfile
-      file = client.configuration.gushfile
-      if !gushfile.exist?
-        raise Thor::Error, "#{file} not found, please add it to your project".colorize(:red)
+    
+    def preload_rails_app
+      if File.exist?("./config/application.rb") && File.exist?("./config/environment.rb")
+        if ::Rails::VERSION::MAJOR < 4
+          require File.expand_path("./config/environment.rb")
+          ::Rails.application.eager_load!
+        else
+          # Painful contortions, see sidekiq#1791 for discussion
+          require File.expand_path("./config/application.rb")
+          ::Rails::Application.initializer "gush.eager_load" do
+            ::Rails.application.config.eager_load = true
+          end
+          require File.expand_path("./config/environment.rb")
+        end
       end
-
-      require file
-    rescue LoadError
-      raise Thor::Error, "failed to require #{file}".colorize(:red)
     end
+
+    def load_endpoint
+      endpoint = client.configuration.endpoint
+      if !endpoint.exist?
+        raise Thor::Error, "#{endpoint} not found, please add it to your project or make sure it points to the root dir of a Rails 3/4 app".colorize(:red)
+      end
+      
+      require endpoint if !File.directory?(endpoint) && File.exist?(endpoint)
+      
+    rescue LoadError
+      raise Thor::Error, "failed to require #{endpoint}".colorize(:red)
+    end
+    
+    
+    def load_rails_app
+    end
+    
   end
 end
