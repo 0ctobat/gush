@@ -130,22 +130,6 @@ module Gush
       Gush.configuration.gushfile
     end
     
-    def preload_rails_app
-      if File.exist?("./config/application.rb") && File.exist?("./config/environment.rb")
-        if ::Rails::VERSION::MAJOR < 4
-          require File.expand_path("./config/environment.rb")
-          ::Rails.application.eager_load!
-        else
-          # Painful contortions, see sidekiq#1791 for discussion
-          require File.expand_path("./config/application.rb")
-          ::Rails::Application.initializer "gush.eager_load" do
-            ::Rails.application.config.eager_load = true
-          end
-          require File.expand_path("./config/environment.rb")
-        end
-      end
-    end
-
     def load_endpoint
       endpoint = client.configuration.endpoint
       if !endpoint.exist?
@@ -157,10 +141,5 @@ module Gush
     rescue LoadError
       raise Thor::Error, "failed to require #{endpoint}".colorize(:red)
     end
-    
-    
-    def load_rails_app
-    end
-    
   end
 end
