@@ -126,8 +126,8 @@ module Gush
       puts overview(workflow).jobs_list(jobs)
     end
 
-    def gushfile
-      Gush.configuration.gushfile
+    def endpoint
+      Gush.configuration.endpoint
     end
     
     def load_endpoint

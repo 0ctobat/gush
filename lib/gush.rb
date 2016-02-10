@@ -19,8 +19,8 @@ require "gush/worker"
 require "gush/workflow"
 
 module Gush
-  def self.gushfile
-    configuration.gushfile
+  def self.endpoint
+    configuration.endpoint
   end
 
   def self.root
