@@ -2,11 +2,12 @@ require 'securerandom'
 
 module Gush
   class Workflow
-    attr_accessor :id, :jobs, :stopped, :persisted, :arguments
+    attr_accessor :id, :jobs, :stopped, :persisted, :arguments, :retry_jobs
 
     def initialize(*args)
       @id = id
       @jobs = []
+      @retry_jobs = false
       @dependencies = []
       @persisted = false
       @stopped = false
@@ -120,10 +121,14 @@ module Gush
       deps_before.each do |dep|
         @dependencies << {from: node.name.to_s, to: dep.to_s }
       end
-
+      
       node.name
     end
-
+    
+    def sidekiq_retry_jobs(n)
+      @retry_jobs = n
+    end
+    
     def reload
       self.class.find(id)
     end

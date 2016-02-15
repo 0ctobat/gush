@@ -76,6 +76,10 @@ module Gush
     def failed?
       !failed_at.nil?
     end
+    
+    def requeue!
+      @finished_at = @failed_at = nil
+    end
 
     def succeeded?
       finished? && !failed?

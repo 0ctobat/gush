@@ -132,13 +132,13 @@ module Gush
       Gush.configuration.gushfile
     end
     
-    def load_gushfile
-      gushfile = client.configuration.gushfile
+    def load_gushfile      
+      file = client.configuration.gushfile
       if !gushfile.exist?
-        raise Thor::Error, "#{gushfile} not found, please add it to your project or make sure it points to the root dir of a Rails 3/4 app".colorize(:red)
+        raise Thor::Error, "#{file} not found, please add it to your project or make sure it points to the root dir of a Rails 3/4 app".colorize(:red)
       end
       
-      require gushfile if !File.directory?(gushfile) && File.exist?(gushfile)
+      require file if !File.directory?(file) && File.exist?(file)
       
     rescue LoadError
       raise Thor::Error, "failed to require #{gushfile}".colorize(:red)

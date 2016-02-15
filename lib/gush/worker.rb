@@ -4,29 +4,38 @@ require 'yajl'
 module Gush
   class Worker
     include ::Sidekiq::Worker
-    sidekiq_options retry: false
 
     def perform(workflow_id, job_id)
       setup_job(workflow_id, job_id)
 
       job.payloads_hash = incoming_payloads
-
+      
       start = Time.now
       report(:started, start)
 
       failed = false
       error = nil
-
+      
+      
+      report(:requeued, start) if job.failed?
+      mark_as_requeued if job.failed?
+      
       mark_as_started
+      
       begin
         job.work
       rescue Exception => error
         mark_as_failed
         report(:failed, start, error.message)
+        
+        check_and_report_workflow_status
+        
         raise error
       else
         mark_as_finished
         report(:finished, start)
+        
+        check_and_report_workflow_status if @workflow.finished?
 
         enqueue_outgoing_jobs
       end
@@ -52,6 +61,12 @@ module Gush
        payloads[job.klass.to_s] << {:id => job.name, :payload => job.output_payload}
       end
       payloads
+    end
+    
+    def mark_as_requeued
+      job.requeue!
+      client.persist_job(workflow.id, job)
+      check_and_report_workflow_status
     end
 
     def mark_as_finished
@@ -92,8 +107,14 @@ module Gush
     def elapsed(start)
       (Time.now - start).to_f.round(3)
     end
+    
+    
+    def check_and_report_workflow_status
+      client.persist_workflow(@workflow)
+      report_workflow_status
+    end
 
-    def enqueue_outgoing_jobs
+    def enqueue_outgoing_jobs      
       job.outgoing.each do |job_name|
         out = client.load_job(workflow.id, job_name)
         if out.ready_to_start?

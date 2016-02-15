@@ -5,18 +5,18 @@ module Gush
     def initialize(config = Gush.configuration)
       @configuration = config
       @sidekiq = build_sidekiq
-      @redis = build_redis
+      @redis = redis_instance
     end
 
     def configure
       yield configuration
       @sidekiq = build_sidekiq
-      @redis = build_redis
+      @redis = redis_instance
     end
 
     def create_workflow(name)
       begin
-        name.constantize.create
+        flow = name.constantize.create
       rescue NameError
         raise WorkflowNotFound.new("Workflow with given name doesn't exist")
       end
@@ -26,6 +26,13 @@ module Gush
     def start_workflow(workflow, job_names = [])
       workflow.mark_as_started
       persist_workflow(workflow)
+      
+      workflow_report({
+        workflow_id:  workflow.id,
+        status:       workflow.status,
+        started_at:   workflow.started_at,
+        finished_at:  workflow.finished_at
+      })
 
       jobs = if job_names.empty?
                workflow.initial_jobs
@@ -130,10 +137,13 @@ module Gush
     def enqueue_job(workflow_id, job)
       job.enqueue!
       persist_job(workflow_id, job)
-
+      
+      workflow = find_workflow(workflow_id)
+      
       sidekiq.push(
         'class' => Gush::Worker,
         'queue' => configuration.namespace,
+        'retry' => workflow.retry_jobs,
         'args'  => [workflow_id, job.name]
       )
     end
@@ -147,11 +157,11 @@ module Gush
       flow.jobs = []
       flow.stopped = hash.fetch(:stopped, false)
       flow.id = hash[:id]
-
-      (nodes || hash[:nodes]).each do |node|
+      
+      (nodes || hash[:nodes]).each do |node|        
         flow.jobs << Gush::Job.from_hash(flow, node)
       end
-
+      
       flow
     end
 
@@ -161,15 +171,19 @@ module Gush
 
 
     def build_sidekiq
-      Sidekiq::Client.new(connection_pool)
+      Sidekiq::Client.new()
+    end
+    
+    def redis_instance
+      $redis ||= Redis.new(url: configuration.redis_url)
     end
 
-    def build_redis
+    def build_redis_pool
       Redis.new(url: configuration.redis_url)
     end
 
     def connection_pool
-      ConnectionPool.new(size: configuration.concurrency, timeout: 1) { build_redis }
+      ConnectionPool.new(size: configuration.concurrency, timeout: 1) { build_redis_pool }
     end
   end
 end
