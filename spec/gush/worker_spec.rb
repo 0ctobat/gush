@@ -21,15 +21,16 @@ describe Gush::Worker do
     context "when job fails" do
       it "should mark it as failed" do
         allow(job).to receive(:work).and_raise(StandardError)
+        
         expect(client).to receive(:worker_report).with(hash_including(status: :failed)).ordered
-
         expect(client).to receive(:persist_workflow)
         expect(client).to receive(:workflow_report)
-
+        
         expect do
           subject.perform(workflow.id, "Prepare")
         end.to raise_error(StandardError)
-        expect(workflow.find_job("Prepare")).to be_failed
+        
+        expect(job).to be_failed
       end
 
       it "reports that job failed" do

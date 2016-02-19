@@ -16,18 +16,17 @@ module Gush
       failed = false
       error = nil
       
-      
       report(:requeued, start) if job.failed?
       mark_as_requeued if job.failed?
       
       mark_as_started
-      
       begin
         job.work
       rescue Exception => error
         mark_as_failed
         report(:failed, start, error.message)
-        
+                
+        reload_workflow_jobs
         check_and_report_workflow_status
         
         raise error
@@ -35,6 +34,7 @@ module Gush
         mark_as_finished
         report(:finished, start)
         
+        reload_workflow_jobs
         check_and_report_workflow_status if @workflow.finished?
 
         enqueue_outgoing_jobs
@@ -66,6 +66,7 @@ module Gush
     def mark_as_requeued
       job.requeue!
       client.persist_job(workflow.id, job)
+      reload_workflow_jobs
       check_and_report_workflow_status
     end
 
@@ -109,8 +110,13 @@ module Gush
     end
     
     
+    def reload_workflow_jobs
+      @workflow.reload_jobs
+    end
+    
+    
     def check_and_report_workflow_status
-      client.persist_workflow(@workflow)
+      client.persist_workflow(@workflow, false)
       report_workflow_status
     end
 

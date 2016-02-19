@@ -188,6 +188,10 @@ module Gush
     def id
       @id ||= client.next_free_workflow_id
     end
+    
+    def reload_jobs
+      @jobs = client.reload_workflow_jobs(id)
+    end
 
     private
 

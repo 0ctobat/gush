@@ -91,12 +91,29 @@ module Gush
       end
     end
 
-    def persist_workflow(workflow)
+    def persist_workflow(workflow, persist_jobs = true)
       redis.set("gush.workflows.#{workflow.id}", workflow.to_json)
-      workflow.jobs.each {|job| persist_job(workflow.id, job) }
+      workflow.jobs.each {|job| persist_job(workflow.id, job) } if persist_jobs
       workflow.mark_as_persisted
       true
     end
+    
+    def reload_workflow_jobs(id)
+      jobs = []
+      data = redis.get("gush.workflows.#{id}")
+      unless data.nil?
+        hash = Gush::JSON.decode(data, symbolize_keys: true)
+        keys = redis.keys("gush.jobs.#{id}.*")
+        nodes = redis.mget(*keys).map { |json| Gush::JSON.decode(json, symbolize_keys: true) }
+        nodes.each do |node|
+          jobs << Gush::Job.from_hash(hash, node)
+        end
+        return jobs
+      else
+        raise WorkflowNotFound.new("Workflow with given id doesn't exist")
+      end
+    end
+    
 
     def persist_job(workflow_id, job)
       redis.set("gush.jobs.#{workflow_id}.#{job.name}", job.to_json)
