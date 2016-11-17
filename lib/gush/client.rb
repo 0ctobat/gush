@@ -3,9 +3,9 @@ module Gush
     attr_reader :configuration
 
     def initialize(config = Gush.configuration)
+      ap config
       @configuration = config
       @sidekiq = build_sidekiq
-      ap redis
     end
 
     def configure
@@ -192,6 +192,7 @@ module Gush
     end
     
     def redis
+      ap configuration
       @redis ||= Redis.new(url: configuration.redis_url)
     end
 
