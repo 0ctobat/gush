@@ -6,6 +6,8 @@ module Gush
       @configuration = config
       @sidekiq = build_sidekiq
       @redis = redis_instance
+      
+      ap @redis
     end
 
     def configure
@@ -64,6 +66,9 @@ module Gush
     end
 
     def next_free_workflow_id
+      
+      ap redis
+      
       id = nil
       loop do
         id = SecureRandom.uuid
