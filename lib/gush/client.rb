@@ -5,15 +5,12 @@ module Gush
     def initialize(config = Gush.configuration)
       @configuration = config
       @sidekiq = build_sidekiq
-      @redis = redis_instance
-      
-      ap @redis
+      ap redis
     end
 
     def configure
       yield configuration
       @sidekiq = build_sidekiq
-      @redis = redis_instance
     end
 
     def create_workflow(name)
@@ -66,9 +63,6 @@ module Gush
     end
 
     def next_free_workflow_id
-      
-      ap redis
-      
       id = nil
       loop do
         id = SecureRandom.uuid
@@ -197,8 +191,8 @@ module Gush
       Sidekiq::Client.new()
     end
     
-    def redis_instance
-      $redis ||= Redis.new(url: configuration.redis_url)
+    def redis
+      @redis ||= Redis.new(url: configuration.redis_url)
     end
 
     def build_redis_pool
