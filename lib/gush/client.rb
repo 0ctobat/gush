@@ -56,6 +56,7 @@ module Gush
       loop do
         id = SecureRandom.uuid
         job_identifier = "#{job_klass}-#{id}"
+        
         break if !redis.exists("gush.jobs.#{workflow_id}.#{job_identifier}")
       end
 
@@ -200,7 +201,7 @@ module Gush
     end
 
     def connection_pool
-      ConnectionPool.new(size: configuration.concurrency, timeout: 1) { build_redis_pool }
+      @connection_pool ||= ConnectionPool.new(size: configuration.concurrency, timeout: 1) { build_redis_pool }
     end
   end
 end
