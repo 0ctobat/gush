@@ -170,15 +170,15 @@ module Gush
     attr_reader :sidekiq, :redis
 
     def workflow_from_hash(hash, nodes = nil)
-      flow = hash[:klass].constantize.new
+      flow = hash[:klass].constantize.new *hash[:arguments]
       flow.jobs = []
       flow.stopped = hash.fetch(:stopped, false)
       flow.id = hash[:id]
-      
-      (nodes || hash[:nodes]).each do |node|        
+
+      (nodes || hash[:nodes]).each do |node|
         flow.jobs << Gush::Job.from_hash(flow, node)
       end
-      
+
       flow
     end
 
