@@ -3,7 +3,6 @@ module Gush
     attr_reader :configuration
 
     def initialize(config = Gush.configuration)
-      ap config
       @configuration = config
       @sidekiq = build_sidekiq
     end

@@ -10,7 +10,7 @@ module Gush
     class_option :gushfile, desc: "configuration file to use", aliases: "-f"
     class_option :endpoint, desc: "Optional path to Rails 3/4 app, for sidekiq endpoint. Default to Gush configuration file", aliases: "-a"
     class_option :concurrency, desc: "concurrency setting for Sidekiq", aliases: "-c"
-    class_option :redis_url, desc: "Redis URL to use", aliases: "-r"
+    class_option :redis, desc: "Redis URL to use", aliases: "-r"
     class_option :namespace, desc: "namespace to run jobs in", aliases: "-n"
     class_option :environment, desc: "Sidekiq environment", aliases: "-e"
 
