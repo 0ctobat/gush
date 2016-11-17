@@ -191,7 +191,6 @@ module Gush
     end
     
     def redis
-      ap configuration
       @redis ||= Redis.new(url: configuration.redis_url)
     end
 

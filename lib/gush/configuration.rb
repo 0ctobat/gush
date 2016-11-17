@@ -9,8 +9,6 @@ module Gush
     end
 
     def initialize(hash = {})
-      ap hash
-      
       self.concurrency = hash.fetch(:concurrency, 5)
       self.namespace   = hash.fetch(:namespace, 'gush')
       self.redis_url   = hash.fetch(:redis_url, 'redis://localhost:6379')

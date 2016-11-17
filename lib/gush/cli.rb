@@ -94,7 +94,6 @@ module Gush
     desc "workers", "Starts Sidekiq workers"
     def workers
       config = client.configuration
-      ap config
       Kernel.exec "bundle exec sidekiq -r #{config.endpoint} -c #{config.concurrency} -q #{config.namespace} -e #{config.environment} -v"
     end
 
