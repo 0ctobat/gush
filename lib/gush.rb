@@ -25,7 +25,7 @@ module Gush
   end
   
   def self.build_redis_pool
-    Redis.new(url: configuration.redis_url)
+    Redis.new(url: configuration.redis_url, id: "gush-client-pool-#{Random.rand(15000)}")
   end
   
   

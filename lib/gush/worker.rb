@@ -120,7 +120,7 @@ module Gush
       report_workflow_status
     end
 
-    def enqueue_outgoing_jobs      
+    def enqueue_outgoing_jobs
       job.outgoing.each do |job_name|
         out = client.load_job(workflow.id, job_name)
         if out.ready_to_start?
