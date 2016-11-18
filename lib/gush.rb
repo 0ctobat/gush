@@ -24,7 +24,7 @@ module Gush
     @connection_pool ||= ConnectionPool.new(size: configuration.concurrency, timeout: 1) { build_redis_pool }
   end
   
-  def build_redis_pool
+  def self.build_redis_pool
     Redis.new(url: configuration.redis_url)
   end
   
