@@ -20,6 +20,16 @@ require "gush/workflow"
 
 module Gush
   
+  def self.connection_pool
+    @connection_pool ||= ConnectionPool.new(size: configuration.concurrency, timeout: 1) { build_redis_pool }
+  end
+  
+  def build_redis_pool
+    Redis.new(url: configuration.redis_url)
+  end
+  
+  
+  
   def self.gushfile
     configuration.gushfile
   end

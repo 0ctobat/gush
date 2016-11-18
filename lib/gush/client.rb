@@ -1,6 +1,6 @@
 module Gush
   class Client
-    attr_reader :configuration
+    attr_reader :configuration, :sidekiq
 
     def initialize(config = Gush.configuration)
       @configuration = config
@@ -55,7 +55,12 @@ module Gush
         id = SecureRandom.uuid
         job_identifier = "#{job_klass}-#{id}"
         
-        break if !redis.exists("gush.jobs.#{workflow_id}.#{job_identifier}")
+        
+        available = Gush.connection_pool.with do |redis|
+          !redis.exists("gush.jobs.#{workflow_id}.#{job_identifier}")
+        end
+
+        break if available
       end
 
       job_identifier
@@ -65,57 +70,76 @@ module Gush
       id = nil
       loop do
         id = SecureRandom.uuid
-        break if !redis.exists("gush.workflow.#{id}")
+        available = Gush.connection_pool.with do |redis|
+          !redis.exists("gush.workflow.#{id}")
+        end
+
+        break if available
       end
 
       id
     end
-
+    
+    
     def all_workflows
-      redis.keys("gush.workflows.*").map do |key|
-        id = key.sub("gush.workflows.", "")
-        find_workflow(id)
+      Gush.connection_pool.with do |redis|
+        redis.keys("gush.workflows.*").map do |key|
+          id = key.sub("gush.workflows.", "")
+          find_workflow(id)
+        end
       end
     end
 
     def find_workflow(id)
-      data = redis.get("gush.workflows.#{id}")
-      unless data.nil?
-        hash = Gush::JSON.decode(data, symbolize_keys: true)
-        keys = redis.keys("gush.jobs.#{id}.*")
-        nodes = redis.mget(*keys).map { |json| Gush::JSON.decode(json, symbolize_keys: true) }
-        workflow_from_hash(hash, nodes)
-      else
-        raise WorkflowNotFound.new("Workflow with given id doesn't exist")
+      Gush.connection_pool.with do |redis|
+        data = redis.get("gush.workflows.#{id}")
+
+        unless data.nil?
+          hash = Gush::JSON.decode(data, symbolize_keys: true)
+          keys = redis.keys("gush.jobs.#{id}.*")
+          nodes = redis.mget(*keys).map { |json| Gush::JSON.decode(json, symbolize_keys: true) }
+          workflow_from_hash(hash, nodes)
+        else
+          raise WorkflowNotFound.new("Workflow with given id doesn't exist")
+        end
       end
     end
 
+
     def persist_workflow(workflow, persist_jobs = true)
-      redis.set("gush.workflows.#{workflow.id}", workflow.to_json)
+      Gush.connection_pool.with do |redis|
+        redis.set("gush.workflows.#{workflow.id}", workflow.to_json)
+      end
+      
       workflow.jobs.each {|job| persist_job(workflow.id, job) } if persist_jobs
       workflow.mark_as_persisted
       true
     end
     
+    
     def reload_workflow_jobs(id)
       jobs = []
-      data = redis.get("gush.workflows.#{id}")
-      unless data.nil?
-        hash = Gush::JSON.decode(data, symbolize_keys: true)
-        keys = redis.keys("gush.jobs.#{id}.*")
-        nodes = redis.mget(*keys).map { |json| Gush::JSON.decode(json, symbolize_keys: true) }
-        nodes.each do |node|
-          jobs << Gush::Job.from_hash(hash, node)
+      Gush.connection_pool.with do |redis|
+        data = redis.get("gush.workflows.#{id}")
+        unless data.nil?
+          hash = Gush::JSON.decode(data, symbolize_keys: true)
+          keys = redis.keys("gush.jobs.#{id}.*")
+          nodes = redis.mget(*keys).map { |json| Gush::JSON.decode(json, symbolize_keys: true) }
+          nodes.each do |node|
+            jobs << Gush::Job.from_hash(hash, node)
+          end
+          return jobs
+        else
+          raise WorkflowNotFound.new("Workflow with given id doesn't exist")
         end
-        return jobs
-      else
-        raise WorkflowNotFound.new("Workflow with given id doesn't exist")
       end
     end
     
 
     def persist_job(workflow_id, job)
-      redis.set("gush.jobs.#{workflow_id}.#{job.name}", job.to_json)
+      Gush.connection_pool.with do |redis|
+        redis.set("gush.jobs.#{workflow_id}.#{job.name}", job.to_json)
+      end
     end
 
     def load_job(workflow_id, job_id)
@@ -123,10 +147,17 @@ module Gush
       job_name_match = /(?<klass>\w*[^-])-(?<identifier>.*)/.match(job_id)
       hypen = '-' if job_name_match.nil?
 
-      keys = redis.keys("gush.jobs.#{workflow_id}.#{job_id}#{hypen}*")
-      return nil if keys.nil?
 
-      data = redis.get(keys.first)
+      keys = Gush.connection_pool.with do |redis|
+        redis.keys("gush.jobs.#{workflow_id}.#{job_id}#{hypen}*")
+      end
+
+      return nil if keys.nil?
+      
+      data = Gush.connection_pool.with do |redis|
+        redis.get(keys.first)
+      end
+
       return nil if data.nil?
 
       data = Gush::JSON.decode(data, symbolize_keys: true)
@@ -134,12 +165,17 @@ module Gush
     end
 
     def destroy_workflow(workflow)
-      redis.del("gush.workflows.#{workflow.id}")
+      Gush.connection_pool.with do |redis|
+        redis.del("gush.workflows.#{workflow.id}")
+      end
+
       workflow.jobs.each {|job| destroy_job(workflow.id, job) }
     end
 
     def destroy_job(workflow_id, job)
-      redis.del("gush.jobs.#{workflow_id}.#{job.name}")
+      Gush.connection_pool.with do |redis|
+        redis.del("gush.jobs.#{workflow_id}.#{job.name}")
+      end
     end
 
     def worker_report(message)
@@ -166,7 +202,6 @@ module Gush
 
     private
 
-    attr_reader :sidekiq, :redis
 
     def workflow_from_hash(hash, nodes = nil)
       flow = hash[:klass].constantize.new *hash[:arguments]
@@ -182,24 +217,16 @@ module Gush
     end
 
     def report(key, message)
-      redis.publish(key, Gush::JSON.encode(message))
+      Gush.connection_pool.with do |redis|
+        redis.publish(key, Gush::JSON.encode(message))
+      end
     end
 
 
     def build_sidekiq
-      Sidekiq::Client.new()
+      Sidekiq::Client.new(Gush.connection_pool)
     end
     
-    def redis
-      @redis ||= Redis.new(url: configuration.redis_url)
-    end
-
-    def build_redis_pool
-      Redis.new(url: configuration.redis_url)
-    end
-
-    def connection_pool
-      @connection_pool ||= ConnectionPool.new(size: configuration.concurrency, timeout: 1) { build_redis_pool }
-    end
+    
   end
 end
