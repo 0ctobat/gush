@@ -1,6 +1,6 @@
 module Gush
   class Job
-    attr_accessor :workflow_id, :incoming, :outgoing, :params,
+    attr_accessor :workflow, :incoming, :outgoing, :params,
       :finished_at, :failed_at, :started_at, :enqueued_at, :payloads_hash, :klass
     attr_reader :name, :output_payload, :params, :payloads
 
