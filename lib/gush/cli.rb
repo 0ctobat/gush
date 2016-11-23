@@ -90,6 +90,14 @@ module Gush
       ]
       puts Terminal::Table.new(headings: headers, rows: rows)
     end
+    
+    desc "rm_done", "Clears all finished workflows"
+    def rm_done
+      workflows = client.all_workflows.select{|workflow| workflow.finished?}
+      workflows.each do |workflow|
+        client.destroy_workflow(workflow)
+      end
+    end
 
     desc "workers", "Starts Sidekiq workers"
     def workers
