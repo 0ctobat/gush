@@ -42,6 +42,7 @@ module Gush
       job = find_job(job_name)
       return if job.nil? || !job.failed?
       
+      job.requeue!
       job.finish!
       client.persist_job(self.id, job)
       
