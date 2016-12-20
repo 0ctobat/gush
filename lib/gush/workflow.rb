@@ -34,6 +34,42 @@ module Gush
         client.enqueue_job(id, job)
       end
     end
+    
+    
+    def skip_failed_job(job_name)
+      client = Gush::Client.new
+      
+      job = find_job(job_name)
+      return if job.nil? || !job.failed?
+      
+      job.finish!
+      client.persist_job(self.id, job)
+      
+      message = {
+        status: :finished,
+        workflow_id: self.id,
+        job: job_name,
+        duration: 0
+      }
+      client.worker_report(message)
+      
+      reload_jobs
+      client.persist_workflow(self, false)
+      
+      client.workflow_report({
+        workflow_id:  self.id,
+        status:       self.status,
+        started_at:   self.started_at,
+        finished_at:  self.finished_at
+      })
+      
+      job.outgoing.each do |job_name|
+        out = client.load_job(self.id, job_name)
+        if out.ready_to_start?
+          client.enqueue_job(self.id, out)
+        end
+      end
+    end
 
     def save
       persist!
